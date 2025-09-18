@@ -32,7 +32,7 @@
         class="px-5"
         width="250px"
         max-width="250px"
-        src="/abi.png"
+        :src="abi_logo"
       ></v-img>
     </div>
   </v-app-bar>
@@ -41,7 +41,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import IntroPanel from "@/components/intro/IntroPanel.vue";
-import emitter from "@/plugins/custom-emitter";;
+import emitter from "@/plugins/custom-emitter";
+import abi_logo from "@/assets/images/abi.png";
 
 
 defineProps({
