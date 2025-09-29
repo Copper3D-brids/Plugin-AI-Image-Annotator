@@ -7,13 +7,16 @@ import { IRequests } from "@/models/apiTypes";
  * If you want to connect to the local server, please change Base_URL http://127.0.0.1:8000/api.
  */
 // const Base_URL = "http://127.0.0.1:8082/api"
-const Base_URL = "http://130.216.217.115:8082/api";
-// const Base_URL = import.meta.env.VITE_APP_API_URL;
+// const Base_URL = "http://130.216.217.115:8082/api";
+const base_url = import.meta.env.VITE_PLUGIN_API_URL;
+const port = import.meta.env.VITE_PLUGIN_API_PORT;
 
 
 const maxRetries = 3;
 const retryDelay = 1000;
-axios.defaults.baseURL = Base_URL;
+
+const endpoint = `${base_url}:${port}/api`;
+axios.defaults.baseURL = endpoint;
 
 axios.interceptors.request.use((config: AxiosRequestConfig | any) => config);
 axios.interceptors.response.use(
