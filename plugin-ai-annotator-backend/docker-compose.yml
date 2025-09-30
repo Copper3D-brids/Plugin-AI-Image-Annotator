@@ -6,4 +6,4 @@ services:
     ports:
       - "8002:8082"
     volumes:
-      - ../../data:/annotator_gui_backend/data/duke
+      - digitaltwins_portal_datasets:/annotator_gui_backend/data/duke
