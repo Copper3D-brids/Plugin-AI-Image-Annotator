@@ -5,6 +5,7 @@ services:
       dockerfile: backend_compose_dockerfile
     ports:
       - "8002:8082"
+    restart: unless-stopped
     volumes:
       - digitaltwins_portal_datasets:/annotator_gui_backend/data
 
