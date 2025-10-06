@@ -12,7 +12,7 @@ root_dir = current_file.parent.parent
 
 
 def set_data_root_path():
-    Config.BASE_PATH = root_dir / "data" / "duke"
+    Config.BASE_PATH = root_dir / "data" 
 
 
 router = APIRouter()
