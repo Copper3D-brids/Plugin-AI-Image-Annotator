@@ -1,4 +1,5 @@
 import json
+import pprint
 import time
 import pandas as pd
 from .setup import Config
@@ -236,6 +237,7 @@ def get_mask_by_nn(point, case_name):
     nrrd_c1_path = get_file_path(case_name,"nrrd", "c1.nrrd")
     with open(mask_json_path, "r") as json_file:
         mask_json = json.load(json_file)
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     use_pinned_memory = True if torch.cuda.is_available() else False
     session = nnInteractiveInferenceSession(

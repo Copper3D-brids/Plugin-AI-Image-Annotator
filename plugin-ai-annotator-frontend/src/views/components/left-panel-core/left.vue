@@ -44,13 +44,19 @@ import {
   ILeftCoreCopperInit,
   IToolCalculateSpherePositionsData,
   IToolGetSliceNumber,
-  IToolAfterLoadImagesResponse
+  IToolAfterLoadImagesResponse,
+  ILoadUrls,
+  IStoredMasks
 } from "@/models/apiTypes";
 import { getTumourCenterInCompleteCases, distance3D, customRound } from "@/plugins/view-utils/utils-left";
-import {useTumourStudyDetailsStore, useTumourStudyNrrdStore, } from "@/store/tumour_position_study_app";
-import {useSaveTumourStudyReport, useNNInteractiveMask} from "@/plugins/tumour_position_study_api";
+import {
+  useInitMarksStore
+} from "@/store/app";
+import {useTumourStudyDetailsStore, useTumourStudyNrrdStore} from "@/store/tumour_position_study_app";
+import {useSaveTumourStudyReport, useNNInteractiveMask, } from "@/plugins/tumour_position_study_api";
 import { switchAnimationStatus } from "@/components/view-components/leftCoreUtils";
 import { useSaveTumourPosition } from "@/plugins/api";
+import { convertInitMaskData } from "@/plugins/worker";
 
 import emitter from "@/plugins/custom-emitter";
 
@@ -95,10 +101,12 @@ const { studyDetails } = storeToRefs(useTumourStudyDetailsStore());
 const { getTumourStudyDetails } = useTumourStudyDetailsStore();
 const { studyNrrd } = storeToRefs(useTumourStudyNrrdStore());
 const { getStudyNrrd } = useTumourStudyNrrdStore();
+const { sendInitMask } = useInitMarksStore();
 
 
 const incompleteCases = ref<ITumourStudyAppDetail[]>([]);
 const workingCase = ref<ITumourStudyAppDetail | null>(null);
+let loadedUrls: ILoadUrls = {};
 
 
 
@@ -130,26 +138,19 @@ const emitterOnCaseReport = async (report:ITumourStudyReport)=>{
 }
 
 
-watch(nnMaskJsonBlob, (newValue) => {
-  if (newValue !== null) {
-    loadJsonMasks(nnMaskJsonBlob.value as unknown as string);
-  }
-});
+// watch(nnMaskJsonBlob, async (newValue) => {
+//   console.log("nnMaskJsonBlob changed", newValue);
+  
+//   if (newValue !== null) {
+//     loadJsonMasks(nnMaskJsonBlob.value as unknown as string);
+//   }else{
+//     console.log("nnMaskJsonBlob is null");
+    
+//     await sendInitMaskToBackend();
+//   }
+// },{immediate: true});
 
-const loadJsonMasks = (url: string) => {
-  switchAnimationStatus(loadingContainer!, progress!, "flex", "Loading masks data......");
 
-  const xhr = new XMLHttpRequest();
-  xhr.open("GET", url, true);
-  xhr.responseType = "json";
-  xhr.onload = function () {
-    if (xhr.status === 200) {
-      const data = xhr.response;
-      nrrdTools!.setMasksData(data, loadBarMain);
-    }
-  };
-  xhr.send();
-};
 
 
 
@@ -206,6 +207,71 @@ const resetSlicesOrientation = (axis: "x" | "y" | "z") => {
 
 const getSliceChangedNum = (sliceNum: number) => {
   nrrdTools!.setSliceMoving(sliceNum);
+};
+
+const sendInitMaskToBackend = async () => {
+  // const masksData = nrrdTools!.paintImages.z;
+  const rawMaskData = nrrdTools!.getMaskData();
+  console.log("rawMaskData", rawMaskData);
+  
+  const masksData = {
+    label1: rawMaskData.paintImagesLabel1.z,
+    label2: rawMaskData.paintImagesLabel2.z,
+    label3: rawMaskData.paintImagesLabel3.z,
+  };
+  const dimensions = nrrdTools!.getCurrentImageDimension();
+  const len = rawMaskData.paintImages.z.length;
+  const width = dimensions[0];
+  const height = dimensions[1];
+  const voxelSpacing = nrrdTools!.getVoxelSpacing();
+  const spaceOrigin = nrrdTools!.getSpaceOrigin();
+  
+  console.log(rawMaskData.paintImages.z);
+  console.log(len);
+  
+  
+  if (len > 0) {
+    const result = convertInitMaskData({
+      masksData,
+      len,
+      width,
+      height,
+      voxelSpacing,
+      spaceOrigin,
+      msg: "init",
+    });
+    const body = {
+      caseId: currentCaseName.value,
+      masks: result.masks as IStoredMasks,
+    };
+    let start_c: unknown = new Date();
+    console.log("sendInitMaskToBackend body", body);
+    
+    await sendInitMask(body);
+    let end_c: unknown = new Date();
+    let timeDiff_c = (end_c as number) - (start_c as number);
+    console.log(`axios send Time taken: ${timeDiff_c}ms`);
+    console.log("send");
+  }
+};
+
+const loadJsonMasks = (url: string) => {
+  switchAnimationStatus(loadingContainer!, progress!, "flex", "Loading masks data......");
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("GET", url, true);
+  xhr.responseType = "json";
+  xhr.onload = function () {
+    if (xhr.status === 200) {
+      const data = xhr.response;
+      if (data === null) {
+        console.log("data empty init");
+        sendInitMaskToBackend();
+      }
+      nrrdTools!.setMasksData(data, loadBarMain);
+    }
+  };
+  xhr.send();
 };
 
 /**
@@ -268,6 +334,7 @@ const handleAllImagesLoaded = async (res:IToolAfterLoadImagesResponse) => {
   max.value = nrrdTools!.getMaxSliceNum()[1];
   // step 3: tell all relevant components that all images are loaded
   emitter.emit("TumourStudy:ImageLoaded", workingCase.value);
+  await sendInitMaskToBackend();
 }
 
 // request case nrrd image from backend, and get the nrrd image blob url
@@ -290,6 +357,21 @@ async function onCaseSwitched() {
   });
   currentCaseContractsCount.value = currentCaseContrastUrls.value.length;
 }
+
+watch(nnMaskJsonBlob, async (newValue) => {
+  console.log("nnMaskJsonBlob changed", newValue);
+  
+  try {
+    if (newValue !== null) {
+      loadJsonMasks(newValue as unknown as string);
+    } else {
+      console.log("nnMaskJsonBlob is null");
+      
+    }
+  } catch (err) {
+    console.error("Error in nnMaskJsonBlob watcher:", err);
+  }
+});
 
 onUnmounted(() => {
   emitter.off("TumourStudy:NextCase", emitterOnNextCase);

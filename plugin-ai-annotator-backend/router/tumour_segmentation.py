@@ -12,7 +12,7 @@ current_file = Path(__file__).resolve()
 root_dir = current_file.parent.parent
 
 def set_data_root_path():
-    Config.BASE_PATH = root_dir / "data"
+    Config.BASE_PATH = root_dir / "data" / "duke"
 
 router = APIRouter()
 
